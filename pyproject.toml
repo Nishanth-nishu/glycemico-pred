@@ -1,0 +1,12 @@
+[project]
+name = "earspectro"
+version = "0.1.0"
+description = "Earlobe NIR spectroscopy -> blood glucose: QC, preprocessing, ML/DL baselines, subject-independent evaluation"
+requires-python = ">=3.10"
+
+[tool.setuptools]
+packages = ["earspectro", "earspectro.data", "earspectro.models"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
