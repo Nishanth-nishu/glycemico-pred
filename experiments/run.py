@@ -264,13 +264,15 @@ def cmd_report(a):
                   _md(single, ["model", "wavelengths", "MAE", "R2"]), ""]
     f = o / "selection" / "selection.csv"
     if f.exists():
-        d = pd.read_csv(f)
+        d = pd.read_csv(f).fillna({"selector": "none"})
         lines += ["## Feature selection on engineered features", "",
                   _md(d, ["model", "selector", "k_features", "MAE", "R2"]), ""]
     f = o / "calibration" / "calibration_curve.csv"
     if f.exists():
         d = pd.read_csv(f)
         lines += ["## Calibration burden (H6)", "",
+                  "`ref_only` ignores the spectra (predicts the mean calibration reference); "
+                  "a model is only adding information where it beats `ref_only` at the same k.", "",
                   _md(d, ["model", "method", "k_cal", "MAE", "delta_MAE", "R2", "n"]), "",
                   "![](calibration/calibration_curve.png)", ""]
     f = o / "explain" / "importance_summary.csv"

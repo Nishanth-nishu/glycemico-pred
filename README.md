@@ -105,6 +105,38 @@ Results land in `outputs/<study>/` and are summarised in `outputs/REPORT.md`.
 | H6 | few-point calibration helps | `calibration` |
 | H7 | interference-robust training generalises | planned: transfer learning once a pretraining corpus is chosen |
 
+## Findings so far (synthetic data, 2026-10-24)
+
+Three datasets, 40 subjects × 2 OGTT sessions × 16 timepoints × 3 repeats:
+`ear5` (the 5-LED layout at default realism), `dense` (1000–1700 nm every 5 nm, same physiology),
+and `control_ear5` (5 LEDs, 5× stronger glucose band, no temperature confounder).
+Full tables: `outputs/<dataset>/REPORT.md`. Errors are on **unseen subjects** unless stated.
+
+1. **The pipeline finds signal when it exists.** On the positive control, ridge/PLSR/SVR reach
+   R² ≈ 0.51–0.54 (MAE ≈ 29 mg/dL) on unseen subjects. The mean predictor gives MAE 43.
+2. **Five LEDs are under-determined at realistic glucose strength.** On `ear5`, no model
+   beats predicting the mean on unseen subjects (best MAE 41.6 vs 43.1; all R² < 0). With the same
+   physiology on a dense spectrum, linear/PLSR models reach R² ≈ 0.32–0.38 (MAE ≈ 32–34).
+   Five channels cannot separate glucose from ~8 nuisance factors (path length, water, lipid,
+   protein, Hb, scatter, gain/tilt, temperature). This argues for more wavelengths or a reference
+   channel, a hypothesis to test on real data.
+3. **Random splits overstate accuracy, as the survey warned (H5).** FFNN on dense:
+   R² +0.60 on a random split, −0.09 on unseen subjects. CatBoost on ear5: +0.31 vs −0.28.
+4. **Nonlinear models do not beat linear ones here (H3/H4).** With 40 subjects, tree models and
+   the CNN fit subject identity. On the dense grid, PLSR/linear plus detrend or d1+SNV are at the top.
+   Permutation importance for CatBoost on held-out subjects is *negative* at every wavelength,
+   so what it learned hurts on new people.
+5. **Preprocessing matters little for linear models and a lot for nonlinear ones (H1).** Across the
+   preprocessing variants, MAE spreads by 2–4 mg/dL for linear/PLSR but 7–16 mg/dL for RF,
+   XGBoost, CatBoost and the CNN. Detrend and d1+SNV give the best dense-grid results. For the
+   tree models, d1+SNV is what makes them competitive at all (CatBoost dense: 32.6 with d1+SNV).
+6. **Calibration gains are mostly the reference level (H6).** A spectra-free `ref_only` control
+   (predict the mean calibration reading) matches every calibrated model on `ear5`. On `dense`,
+   PLSR + 5-point linear calibration reaches MAE 25.5 vs 29.7 for `ref_only`. That ~4 mg/dL is the
+   part the optical model actually adds.
+7. **QC works on the injected artifacts.** 96–100% of motion, ambient, saturation and dropout spectra
+   are rejected, and 0.05% of clean spectra.
+
 ## Not done yet
 
 - Transfer learning (§21): waiting for a relevant pretraining spectral dataset.

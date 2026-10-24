@@ -6,5 +6,5 @@ catboost_info/
 logs/
 data/*.csv
 outputs/**/oof_*.csv
-outputs/qc/qc_scores.csv
+outputs/**/qc_scores.csv
 checkpoints/

@@ -9,6 +9,10 @@ remaining points.
     k = 0      universal model
     k = 1      offset:  G' = G_hat + mean(G_ref - G_hat)
     k >= 2     offset, or shrunk linear  G' = a*G_hat + b  (a pulled toward 1)
+
+``ref_only`` ignores the spectra and predicts the mean calibration reference.
+It is the control that tells whether a calibration gain comes from the optical
+model or just from knowing the session's recent glucose level.
 """
 
 from __future__ import annotations
@@ -22,6 +26,8 @@ from .metrics import regression_metrics
 def _calibrate(p_cal, y_cal, p_eval, method: str, shrink: float):
     if len(p_cal) == 0 or method == "none":
         return p_eval
+    if method == "ref_only":
+        return np.full(len(p_eval), np.mean(y_cal))
     if method == "offset" or len(np.unique(p_cal)) < 2:
         return p_eval + np.mean(y_cal - p_cal)
     # Ridge-to-identity slope: minimise sum (y - a p - b)^2 + shrink * n * (a - 1)^2 in centred form.
@@ -32,7 +38,7 @@ def _calibrate(p_cal, y_cal, p_eval, method: str, shrink: float):
     return a * p_eval + b
 
 
-def calibration_curve(oof: pd.DataFrame, ks=(0, 1, 2, 3, 5), methods=("offset", "linear"),
+def calibration_curve(oof: pd.DataFrame, ks=(0, 1, 2, 3, 5), methods=("offset", "linear", "ref_only"),
                       shrink: float = 50.0, per_session: bool = True) -> pd.DataFrame:
     """MAE vs number of calibration timepoints. Calibration is per session when
     ``per_session`` (sensor re-placed each day) else per subject."""
