@@ -4,7 +4,7 @@
 #SBATCH --error=/scratch/nishanth.r/glycemico-pred/logs/earspectro_%j.log
 #SBATCH --partition=plafnet2
 #SBATCH --account=plafnet2
-#SBATCH --gres=gpu:1
+# No GPU: the venv has CPU torch and these models are small. For GPU, install CUDA torch and add --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=1-00:00:00

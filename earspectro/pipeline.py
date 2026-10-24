@@ -119,7 +119,7 @@ def cross_validate(df: pd.DataFrame, spec: RunSpec, scenario: str = "subject", n
                    return_models: bool = False):
     """Out-of-fold predictions + metrics for one configuration under one scenario."""
     splits = make_splits(df, scenario, n_splits=n_splits, seed=spec.seed)
-    if scenario != "random":
+    if scenario == "subject":   # the session scenario reuses subjects on purpose (later days)
         check_no_subject_leak(df, splits)
 
     oof, models, n_rejected, n_test = [], [], 0, 0

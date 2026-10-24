@@ -12,6 +12,8 @@ from itertools import combinations
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 
+_trapz = getattr(np, "trapezoid", None) or np.trapz
+
 
 class WavelengthSubset(BaseEstimator, TransformerMixin):
     """Keep only the given wavelengths (by value, nearest match)."""
@@ -84,6 +86,6 @@ class SpectralFeatures(BaseEstimator, TransformerMixin):
         if B.shape[1] > 2:
             slopes = np.diff(B, axis=1) / np.diff(wc)
             feats.append(np.diff(slopes, axis=1) / (0.5 * (wc[2:] - wc[:-2])))
-        area = np.trapz(X, np.asarray(self.wavelengths, float)[: X.shape[1]], axis=1) if X.shape[1] > 1 else X[:, 0]
+        area = _trapz(X, np.asarray(self.wavelengths, float)[: X.shape[1]], axis=1) if X.shape[1] > 1 else X[:, 0]
         feats.append(np.column_stack([area, X.mean(axis=1), X.std(axis=1)]))
         return np.column_stack(feats)

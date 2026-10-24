@@ -21,6 +21,7 @@ from sklearn.preprocessing import FunctionTransformer
 
 class _Stateless(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):
+        self.n_features_in_ = np.asarray(X).shape[1]   # marks the step as fitted for sklearn
         return self
 
 

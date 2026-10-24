@@ -56,7 +56,8 @@ def build_classical(name: str, n_jobs: int = 4, seed: int = 0):
     if name == "catboost":
         from catboost import CatBoostRegressor
         return CatBoostRegressor(iterations=800, learning_rate=0.03, depth=6, l2_leaf_reg=3,
-                                 loss_function="MAE", thread_count=n_jobs, random_seed=seed, verbose=False)
+                                 loss_function="MAE", thread_count=n_jobs, random_seed=seed, verbose=False,
+                                 allow_writing_files=False)
     raise KeyError(f"unknown model '{name}'")
 
 

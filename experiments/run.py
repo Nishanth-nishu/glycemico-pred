@@ -136,7 +136,8 @@ def cmd_wavelengths(a):
     df = load_dataset(a.data)
     wl = wavelengths_of(spectral_columns(df))
     if wl.size > 8:
-        raise SystemExit("subset enumeration is for sparse LED layouts (<= 8 wavelengths)")
+        log(f"skipping: subset enumeration is for sparse LED layouts (<= 8 wavelengths), got {wl.size}")
+        return
     out = Path(a.out) / "wavelengths"
     subsets = [tuple(c) for k in range(1, wl.size + 1) for c in combinations(wl, k)]
 

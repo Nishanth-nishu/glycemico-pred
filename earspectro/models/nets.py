@@ -7,6 +7,7 @@ are passed), so it never peeks at the outer test fold.
 from __future__ import annotations
 
 import copy
+import os
 
 import numpy as np
 import torch
@@ -76,6 +77,7 @@ class SpectraNet(BaseEstimator, RegressorMixin):
 
     def fit(self, X, y, groups=None):
         torch.manual_seed(self.random_state)
+        torch.set_num_threads(int(os.environ.get("SLURM_CPUS_PER_TASK", 4)))
         rng = np.random.default_rng(self.random_state)
         X, y = np.asarray(X, np.float32), np.asarray(y, np.float32)
         self.x_mu_, self.x_sd_ = X.mean(0), X.std(0) + 1e-6
