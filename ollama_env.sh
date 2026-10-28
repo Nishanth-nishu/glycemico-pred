@@ -5,7 +5,8 @@
 #   source /home2/nishanth.r/pen_sm/ollama_env.sh [model]
 #
 # Persistent copy (survives scratch purges, visible on every node):
-#   /home2/nishanth.r/ollama_persist/{bin,lib,models}
+#   /home2/nishanth.r/ollama_persist/ollama-<ver>.tar.zst  (or extracted bin/ lib/)
+#   /home2/nishanth.r/ollama_persist/models
 # Node-local working copy (fast disk, purged ~7-10 days, per node):
 #   /scratch/nishanth.r/ollama
 # Models pulled during the job are synced back to /home2 by ollama_sync_back.
@@ -20,9 +21,24 @@ if [ -z "$SLURM_JOB_ID" ]; then
 fi
 
 echo "[ollama_env] node=$(hostname) job=$SLURM_JOB_ID gpus=${CUDA_VISIBLE_DEVICES:-none}"
-mkdir -p "$SCR"
-echo "[ollama_env] staging $PERSIST -> $SCR"
-rsync -a "$PERSIST/" "$SCR/"
+mkdir -p "$SCR/models"
+# Binary: /home2 keeps either an extracted bin/+lib/ tree or the release
+# archive ollama-<ver>.tar.zst (login node has no zstd; compute nodes do).
+if [ -x "$PERSIST/bin/ollama" ]; then
+    echo "[ollama_env] staging extracted ollama $PERSIST/{bin,lib} -> $SCR"
+    rsync -a "$PERSIST/bin" "$PERSIST/lib" "$SCR/"
+else
+    TARBALL=$(ls -t "$PERSIST"/ollama-*.tar.zst 2>/dev/null | head -1)
+    [ -n "$TARBALL" ] || { echo "[ollama_env] no ollama binary or tarball in $PERSIST" >&2; return 1 2>/dev/null || exit 1; }
+    if [ ! -x "$SCR/bin/ollama" ] || [ "$TARBALL" -nt "$SCR/bin/ollama" ]; then
+        echo "[ollama_env] extracting $(basename "$TARBALL") -> $SCR"
+        tar --zstd -xf "$TARBALL" -C "$SCR"
+    else
+        echo "[ollama_env] $SCR/bin/ollama already current"
+    fi
+fi
+echo "[ollama_env] staging models $PERSIST/models -> $SCR/models"
+rsync -a "$PERSIST/models/" "$SCR/models/"
 
 export PATH="$SCR/bin:$PATH"
 export OLLAMA_MODELS="$SCR/models"
