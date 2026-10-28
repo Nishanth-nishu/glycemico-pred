@@ -7,9 +7,12 @@ selection, subject-independent CV, calibration) can be built and tested before
 real EarSpectro recordings exist. It is NOT a physical forward model: band
 positions follow the usual NIR assignments (water 1450/1200/970 nm, glucose
 C-H/O-H overtones ~1530-1690 nm and ~1130 nm, lipid ~1210 nm) and water values
-are rough literature magnitudes, but glucose band strengths are scaled by
-``glucose_gain`` so the signal is weak-but-learnable. Results on this data say
-nothing about real-world accuracy.
+are rough literature magnitudes. Glucose enters twice, as in Amerov et al.
+(2004): its own overtone bands, and the water it displaces (partial specific
+volume ~0.62 mL/g). Both scale with the optical path. The band strength is set
+by ``glucose_gain``; the default is ~10x the physical value so the signal is
+weak-but-learnable, and ``PHYSICAL_GLUCOSE_GAIN`` gives the literature
+strength. Results on this data say nothing about real-world accuracy.
 """
 
 from __future__ import annotations
@@ -21,6 +24,13 @@ import pandas as pd
 
 EAR5 = [1050, 1200, 1450, 1550, 1650]
 DENSE = list(range(1000, 1701, 5))
+
+NOMINAL_PATH_CM = 0.08
+# Glucose first-overtone absorptivity ~5e-5 per mM per mm (Amerov, Chen & Arnold 2004,
+# range 2-7e-5), i.e. 5e-4 / 18.016 per (mg/dL) per cm, times the nominal path.
+PHYSICAL_GLUCOSE_GAIN = 5e-4 / 18.016 * NOMINAL_PATH_CM   # ~2.2e-6 OD per mg/dL
+# Water volume fraction displaced per mg/dL: 0.62 mL/g * 0.01 g/L / 1000 mL/L.
+WATER_DISPLACEMENT = 6.2e-6
 
 # Approximate water absorption coefficient (cm^-1), interpolated in log space.
 _WATER_TABLE = np.array([
@@ -70,7 +80,8 @@ class SynthConfig:
     timepoints_per_session: int = 16      # OGTT-like, every ~10 min
     repeats: int = 3                      # spectra per timepoint
     wavelengths: list = field(default_factory=lambda: list(EAR5))
-    glucose_gain: float = 2.0e-5          # OD per (mg/dL) at the 1590 nm peak
+    glucose_gain: float = 2.0e-5          # OD per (mg/dL) at the 1590 nm peak, nominal path
+    water_displacement: float = WATER_DISPLACEMENT
     noise_od: float = 1.5e-3              # white sensor noise per wavelength
     confound_strength: float = 1.0        # session-time-locked perfusion/temperature drift
     diabetic_fraction: float = 0.3
@@ -138,11 +149,11 @@ def generate(cfg: SynthConfig) -> pd.DataFrame:
 
                 for rep in range(cfg.repeats):
                     e_w = water_abs(wl, shift_nm=-0.5 * temp) * (1 - 0.003 * temp)
-                    mu = (water_frac * (1 - 6e-7 * g_true) * e_w   # glucose displaces water (~0.6 mL per g)
+                    mu = (water_frac * (1 - cfg.water_displacement * g_true) * e_w   # displaced water
                           + lipid * 0.4 * e_l + protein * 0.5 * e_p
                           + hb * (1 + 0.05 * drift) * e_h)
                     A = path_sess * mu
-                    A = A + cfg.glucose_gain * g_scale * g_true * e_g
+                    A = A + cfg.glucose_gain * (path_sess / NOMINAL_PATH_CM) * g_scale * g_true * e_g
                     A = A + scat_a * (wl / 1000.0) ** (-scat_b)
                     A = A + gain_od + tilt * (wl - wl.mean()) / 500.0
                     A = A + rng.normal(0, cfg.noise_od, wl.size)

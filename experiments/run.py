@@ -2,6 +2,7 @@
 """EarSpectro experiment runner — one sub-command per study in the framework.
 
     generate     synthetic dataset (until real ear recordings exist)
+    import_ntnu  real in-vitro NIR glucose spectra (NTNU, doi:10.18710/NSHFAK) -> EarSpectro CSV
     qc           QC detection vs known artifacts (synthetic only) + rejection stats
     matrix       representation x preprocessing x model  (section 30, H1/H3/H4)
     scenarios    random vs subject vs session split       (section 23, H5)
@@ -30,7 +31,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from earspectro import plots  # noqa: E402
 from earspectro.calibration import calibration_curve  # noqa: E402
 from earspectro.data import TARGET_COL, load_dataset, spectral_columns, wavelengths_of  # noqa: E402
-from earspectro.data.synthetic import DENSE, EAR5, SynthConfig, generate  # noqa: E402
+from earspectro.data.ntnu import GRIDS, load_ntnu  # noqa: E402
+from earspectro.data.synthetic import DENSE, EAR5, PHYSICAL_GLUCOSE_GAIN, SynthConfig, generate  # noqa: E402
 from earspectro.explain import summarise_importance, wavelength_importance  # noqa: E402
 from earspectro.metrics import regression_metrics  # noqa: E402
 from earspectro.pipeline import RunSpec, cross_validate, fit_predict  # noqa: E402
@@ -67,6 +69,17 @@ def cmd_generate(a):
     cols = spectral_columns(df)
     plots.example_spectra(df, cols, wavelengths_of(cols), out.with_suffix(".spectra.png"))
     log(f"{len(df)} spectra, {df.subject_id.nunique()} subjects, {len(cols)} wavelengths -> {out}")
+    log(f"glucose_ref: mean {df[TARGET_COL].mean():.1f}, range {df[TARGET_COL].min():.0f}-{df[TARGET_COL].max():.0f}")
+
+
+def cmd_import_ntnu(a):
+    df = load_ntnu(a.raw, a.grid)
+    out = Path(a.output)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out, index=False)
+    cols = spectral_columns(df)
+    plots.example_spectra(df, cols, wavelengths_of(cols), out.with_suffix(".spectra.png"))
+    log(f"{len(df)} spectra, {df.subject_id.nunique()} mixtures, {len(cols)} wavelengths -> {out}")
     log(f"glucose_ref: mean {df[TARGET_COL].mean():.1f}, range {df[TARGET_COL].min():.0f}-{df[TARGET_COL].max():.0f}")
 
 
@@ -115,7 +128,7 @@ def cmd_scenarios(a):
     df = load_dataset(a.data)
     rows, out = [], Path(a.out) / "scenarios"
     for model in a.models:
-        for scen in ("random", "subject", "session"):
+        for scen in ("random", "subject", "session") + (("holdout",) if "split" in df else ()):
             spec = RunSpec(model=model, preprocessing=a.prep, seed=a.seed, n_jobs=a.n_jobs)
             res, oof = cross_validate(df, spec, scen, a.folds)
             rows.append(res)
@@ -236,10 +249,12 @@ def _md(df: pd.DataFrame, cols, n=None, floatfmt=".2f"):
 
 def cmd_report(a):
     o = Path(a.out)
-    lines = ["# EarSpectro experiment report", "",
-             f"Data: `{a.data}`", "",
-             "> Synthetic data: these numbers validate the pipeline, not the device. "
-             "See README for what the generator does and does not model.", ""]
+    note = ("> NTNU in-vitro data: aqueous mixtures in a cuvette, no tissue. 'Subject' = mixture, "
+            "'session' = measurement day. Clarke zones are not clinically meaningful here."
+            if "ntnu" in Path(a.data).name else
+            "> Synthetic data: these numbers validate the pipeline, not the device. "
+            "See README for what the generator does and does not model.")
+    lines = ["# EarSpectro experiment report", "", f"Data: `{a.data}`", "", note, ""]
     f = o / "scenarios" / "scenarios.csv"
     if f.exists():
         d = pd.read_csv(f)
@@ -290,6 +305,10 @@ def cmd_report(a):
     log(f"  -> {o / 'REPORT.md'}")
 
 
+def _glucose_gain(v):
+    return PHYSICAL_GLUCOSE_GAIN if v == "physical" else float(v)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -299,7 +318,8 @@ def main():
     g.add_argument("--grid", choices=["ear5", "dense"], default="ear5")
     g.add_argument("--subjects", type=int, default=40)
     g.add_argument("--sessions", type=int, default=2)
-    g.add_argument("--glucose_gain", type=float, default=2.0e-5)
+    g.add_argument("--glucose_gain", type=_glucose_gain, default=2.0e-5,
+                   help="OD per mg/dL at 1590 nm, or 'physical' for the literature strength")
     g.add_argument("--noise_od", type=float, default=1.5e-3)
     g.add_argument("--confound", type=float, default=1.0)
     g.add_argument("--seed", type=int, default=0)
@@ -312,6 +332,11 @@ def main():
         sp.add_argument("--folds", type=int, default=5)
         sp.add_argument("--seed", type=int, default=0)
         sp.add_argument("--n_jobs", type=int, default=8)
+
+    n = sub.add_parser("import_ntnu", help="convert the NTNU NIR glucose files (doi:10.18710/NSHFAK)")
+    n.add_argument("--raw", required=True, help="folder with CalibrationData.txt and ValidationData.txt")
+    n.add_argument("--grid", choices=sorted(GRIDS), default="nir")
+    n.add_argument("--output", required=True)
 
     common(sub.add_parser("qc"), [])
     m = sub.add_parser("matrix")

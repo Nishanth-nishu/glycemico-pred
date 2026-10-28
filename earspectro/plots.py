@@ -76,7 +76,7 @@ def error_vs_glucose(y, p, path, title=""):
 
 def scenario_bars(res: pd.DataFrame, path, metric="MAE"):
     piv = res.pivot_table(index="model", columns="scenario", values=metric)
-    order = [c for c in ("random", "subject", "session") if c in piv.columns]
+    order = [c for c in ("random", "subject", "session", "holdout") if c in piv.columns]
     piv = piv[order].sort_values(order[-1] if "subject" not in order else "subject")
     fig, ax = plt.subplots(figsize=(7, 4))
     piv.plot.bar(ax=ax)

@@ -96,3 +96,28 @@ def test_calibration_offset_fixes_constant_bias():
                          "y": y, "pred": y + 20 * (s - 2.5) + rng.normal(0, 1)})
     c = calibration_curve(pd.DataFrame(rows), ks=(0, 1), methods=("offset",))
     assert c.set_index("k_cal").MAE[1] < 0.2 * c.set_index("k_cal").MAE[0]
+
+
+def test_synthetic_glucose_physics():
+    from earspectro.data.synthetic import PHYSICAL_GLUCOSE_GAIN
+
+    assert 1e-6 < PHYSICAL_GLUCOSE_GAIN < 4e-6
+    quiet = dict(n_subjects=1, sessions_per_subject=1, repeats=1, wavelengths=[1450, 1590],
+                 noise_od=0.0, confound_strength=0.0, artifact_rate=0.0, seed=3)
+    # Displaced water alone: absorbance at the 1450 nm water peak falls as glucose rises.
+    d = generate(SynthConfig(glucose_gain=0.0, **quiet))
+    assert np.corrcoef(d.glucose_true, d.A_1450)[0, 1] < -0.99
+    # The glucose band adds absorbance at 1590 nm, scaled by the session's path length.
+    g = generate(SynthConfig(glucose_gain=1e-4, water_displacement=0.0, **quiet))
+    assert np.corrcoef(g.glucose_true, g.A_1590)[0, 1] > 0.99
+
+
+def test_holdout_split_uses_split_column():
+    d = pd.DataFrame({"split": ["cal", "cal", "val", "cal", "val"]})
+    (tr, te), = make_splits(d, "holdout")
+    assert list(tr) == [0, 1, 3] and list(te) == [2, 4]
+
+
+def test_mard_ignores_zero_reference():
+    m = regression_metrics([0.0, 100.0], [10.0, 110.0])
+    assert m["MARD"] == pytest.approx(10.0)

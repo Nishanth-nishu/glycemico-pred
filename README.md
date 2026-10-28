@@ -137,6 +137,46 @@ Full tables: `outputs/<dataset>/REPORT.md`. Errors are on **unseen subjects** un
 7. **QC works on the injected artifacts.** 96–100% of motion, ambient, saturation and dropout spectra
    are rejected, and 0.05% of clean spectra.
 
+## Real data: NTNU aqueous glucose NIR (2026-10-28)
+
+Fuglerud et al., *J Biophotonics* 2021 (doi:10.1002/jbio.202000450); data doi:10.18710/NSHFAK (CC0).
+393 transmission spectra (Metrohm XDS, 400–2500 nm) of 91 aqueous mixtures at ~37 °C, with
+glucose 0–50 mM (0–900 mg/dL) plus lactate, acetaminophen, caffeine and ethanol as interferents.
+**This is in-vitro: no skin, blood or physiology.** It tests whether the pipeline can pull glucose
+out of overlapping NIR absorbers, not whether an ear sensor works.
+
+```
+python experiments/run.py import_ntnu --raw data/ntnu_raw --grid {ear5,dense,nir} --output data/ntnu_<grid>.csv
+sbatch slurm/run_ntnu.sh
+```
+
+Mapping: subject = mixture, session = day (days 2–4 calibration, day 5 validation), `holdout` = the
+authors' own calibration → validation split. Grids: `nir` (1100–1880 + 2050–2350 nm, 542 bands),
+`dense` (1000–1700 nm every 5 nm, 141 bands), `ear5` (the five EarSpectro LED wavelengths).
+
+MAE in mg/dL (÷18 for mM); the mean predictor scores 230–320:
+
+| grid | PLSR unseen-mixture | PLSR day-5 holdout | best nonlinear unseen-mixture |
+|:--|--:|--:|--:|
+| nir (542 bands) | 31.5 (1.7 mM), R² 0.95 | 34.3 (1.9 mM) | FFNN 44.2 |
+| dense (141 bands) | 30.8 (1.7 mM) | 35.5 | FFNN 51.2 |
+| ear5 (5 LEDs) | 102.3 (5.7 mM), R² 0.80 | 95.4 | FFNN 111.1 |
+
+1. **Real NIR spectra carry recoverable glucose.** PLSR reaches R² ≈ 0.95 on mixtures it never saw
+   and holds up on the separate day-5 set, despite four interferents.
+2. **Five LEDs lose about two-thirds of the accuracy (H2).** ear5 error is ~3× the full-spectrum error
+   in the same samples. In nested selection, 1–2 wavelengths do no better than the mean; the
+   1200/1550/1650 nm triple carries most of what 5 LEDs can do. This matches synthetic finding 2.
+3. **Linear wins again (H3/H4).** PLSR is best on every grid and scenario. The CNN and CatBoost trail
+   PLSR by 35–85 mg/dL on dense and nir. Unlike the synthetic case, CatBoost permutation
+   importance on held-out mixtures is mostly positive (20–30% of wavelengths negative).
+4. **Day-to-day drift hurts nonlinear models most (H5).** Trained on one day and tested on a later
+   day of the same mixture, PLSR moves from 31 to 37 mg/dL, but FFNN goes from 44 to 156 and CatBoost from 67 to 106.
+5. On the day-5 holdout, PLSR RMSE (93) is much larger than its MAE (34), so a few validation
+   mixtures are badly predicted. Worth inspecting before quoting the holdout number.
+
+Not run on NTNU: `calibration` (there are no per-subject calibration readings in vitro).
+
 ## Not done yet
 
 - Transfer learning (§21): waiting for a relevant pretraining spectral dataset.

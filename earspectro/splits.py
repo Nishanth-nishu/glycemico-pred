@@ -3,6 +3,7 @@
 A  random      - measurements shuffled; subjects leak across folds (sanity check only)
 B  subject     - GroupKFold on subject_id; test subjects never seen in training (primary)
 C  session     - train on each subject's earlier session(s), test on the last one
+D  holdout     - fixed external test set: train on split == "cal", test on split == "val"
 """
 
 from __future__ import annotations
@@ -26,8 +27,11 @@ def make_splits(df: pd.DataFrame, scenario: str, n_splits: int = 5, seed: int = 
     if scenario == "session":
         order = df.groupby("subject_id")["session_idx"].transform("max")
         test = df["session_idx"].to_numpy() == order.to_numpy()
-        multi = order.to_numpy() > 0
+        multi = (df.groupby("subject_id")["session_idx"].transform("nunique") > 1).to_numpy()
         return [(idx[~test & multi], idx[test & multi])]
+    if scenario == "holdout":
+        val = df["split"].to_numpy() == "val"
+        return [(idx[~val], idx[val])]
     raise ValueError(f"unknown scenario '{scenario}'")
 
 

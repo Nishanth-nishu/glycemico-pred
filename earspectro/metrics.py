@@ -14,12 +14,13 @@ def regression_metrics(y, p) -> dict:
     err = p - y
     ss_res = np.sum(err ** 2)
     ss_tot = np.sum((y - y.mean()) ** 2)
+    pos = y > 0   # relative error is undefined at a zero reference (in-vitro blanks)
     return {
         "n": int(y.size),
         "MAE": float(np.mean(np.abs(err))),
         "RMSE": float(np.sqrt(np.mean(err ** 2))),
         "R2": float(1 - ss_res / ss_tot) if ss_tot > 0 else float("nan"),
-        "MARD": float(100 * np.mean(np.abs(err) / y)),
+        "MARD": float(100 * np.mean(np.abs(err[pos]) / y[pos])) if pos.any() else float("nan"),
         "bias": float(err.mean()),
         "pearson_r": float(np.corrcoef(y, p)[0, 1]) if y.size > 1 and p.std() > 0 else float("nan"),
     }
