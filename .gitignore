@@ -9,3 +9,4 @@ outputs/**/oof_*.csv
 outputs/**/qc_scores.csv
 checkpoints/
 data/ntnu_raw/
+penny-stocks-investing/
