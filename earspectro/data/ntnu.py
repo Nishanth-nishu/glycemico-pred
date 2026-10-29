@@ -12,9 +12,13 @@ Mapping onto the EarSpectro schema (one row = one spectrum):
 
     subject_id   one mixture (identical composition, same file). Repeat spectra of a
                  mixture never straddle train/test under the "subject" split.
-    session_id   measurement day; session_idx = day - 2
+    session_id   one cuvette fill, "day<d>_c<cuvette>" (the in-vitro analogue of one sensor
+                 placement; QC compares repeats within it). session_idx = day - 2, which is
+                 what the "session" split uses
     split        "cal" or "val" (the authors' own separate-day validation set)
     glucose_ref  glucose in mg/dL (mM x 18.016), exact by construction
+    label_suspect  True for the two validation mixtures whose glucose label looks wrong
+                   (see SUSPECT_LABELS)
 """
 
 from __future__ import annotations
@@ -35,6 +39,12 @@ _META = {
 }
 _ANALYTES = ["glucose_mM", "lactate_mM", "acetaminophen_mM", "caffeine_mM", "ethanol_mM"]
 
+# Validation mixtures labelled 50 mM glucose / 15 mM lactate / 0.15 mM acetaminophen
+# (VAL012 in cuvette 3, VAL015 in cuvette 2). A PLSR model trained on the calibration set
+# reads glucose at ~25 mM for all six spectra, while lactate, ethanol, acetaminophen and
+# caffeine come out at their labels, so a glucose prep/labelling error is the likely cause.
+SUSPECT_LABELS = [dict(split="val", glucose_mM=50.0, lactate_mM=15.0, acetaminophen_mM=0.15)]
+
 # Resampling grids: (centres, half-width of the averaging window in nm).
 # "nir" skips 1880-2050 nm, where water absorbance passes ~3 and the detector saturates.
 GRIDS = {
@@ -50,7 +60,7 @@ def _read(path: Path) -> pd.DataFrame:
     return d.loc[:, ~d.columns.str.startswith("Column")].rename(columns=_META)
 
 
-def load_ntnu(raw_dir: str | Path, grid: str = "nir") -> pd.DataFrame:
+def load_ntnu(raw_dir: str | Path, grid: str = "nir", drop_suspect: bool = False) -> pd.DataFrame:
     raw_dir = Path(raw_dir)
     parts = []
     for split, fname in (("cal", "CalibrationData.txt"), ("val", "ValidationData.txt")):
@@ -72,9 +82,17 @@ def load_ntnu(raw_dir: str | Path, grid: str = "nir") -> pd.DataFrame:
 
     meta = d.drop(columns=wl_cols)
     meta["session_idx"] = meta["day"] - 2
-    meta["session_id"] = "day" + meta["day"].astype(str)
+    meta["session_id"] = "day" + meta["day"].astype(str) + "_c" + meta["cuvette"].astype(str)
     meta["repeat"] = meta.groupby(["subject_id", "day"]).cumcount()
     meta["timepoint"] = 0
     meta["glucose_true"] = meta["glucose_mM"] * MG_DL_PER_MM
     meta["glucose_ref"] = meta["glucose_true"]
-    return pd.concat([meta, pd.DataFrame(spec)], axis=1)
+    meta["label_suspect"] = False
+    for rule in SUSPECT_LABELS:
+        m = meta["split"] == rule["split"]
+        for k, v in rule.items():
+            if k != "split":
+                m &= np.isclose(meta[k], v, atol=1e-6)
+        meta["label_suspect"] |= m
+    df = pd.concat([meta, pd.DataFrame(spec)], axis=1)
+    return df[~df["label_suspect"]].reset_index(drop=True) if drop_suspect else df

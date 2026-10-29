@@ -57,6 +57,20 @@ def test_preprocessing_shapes_on_sparse_grid(name):
     assert out.shape == X.shape and np.isfinite(out).all()
 
 
+def test_qc_tolerates_small_fixed_offset():
+    # Three cuvettes, each very repeatable, one ~3% lower: an instrument offset, not an artifact.
+    rng = np.random.default_rng(0)
+    base = np.linspace(0.5, 0.7, 50)
+    X = np.vstack([base + off + rng.normal(0, 1e-4, (30, 50)) for off in (0.0, -0.018, 0.0)])
+    assert QualityControl().fit(X).score(X).qc_pass.all()
+    X[0] += 0.5   # a real level jump is still caught
+    assert not QualityControl().fit(X).score(X).qc_pass[0]
+
+def test_repeat_groups_separate_subjects_sharing_a_session_id():
+    d = pd.DataFrame({"subject_id": ["A", "A", "B", "B"], "session_id": ["day5"] * 4, "timepoint": 0})
+    g = repeat_groups(d)
+    assert g[0] == g[1] and g[2] == g[3] and g[0] != g[2]
+
 def test_qc_flags_injected_artifacts(df):
     from earspectro.data import spectral_columns
     X = df[spectral_columns(df)].to_numpy(float)

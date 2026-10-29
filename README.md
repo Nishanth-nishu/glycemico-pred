@@ -150,30 +150,46 @@ python experiments/run.py import_ntnu --raw data/ntnu_raw --grid {ear5,dense,nir
 sbatch slurm/run_ntnu.sh
 ```
 
-Mapping: subject = mixture, session = day (days 2–4 calibration, day 5 validation), `holdout` = the
-authors' own calibration → validation split. Grids: `nir` (1100–1880 + 2050–2350 nm, 542 bands),
+Mapping: subject = mixture, session = one cuvette fill (the `session` split uses the day: days 2–4
+calibration, day 5 validation), `holdout` = the authors' own calibration → validation split. Grids: `nir` (1100–1880 + 2050–2350 nm, 542 bands),
 `dense` (1000–1700 nm every 5 nm, 141 bands), `ear5` (the five EarSpectro LED wavelengths).
 
-MAE in mg/dL (÷18 for mM); the mean predictor scores 230–320:
+Two validation mixtures, VAL012 and VAL015, are labelled 50 mM glucose but read as ~25 mM. Every
+one of their 6 spectra does, across two cuvettes, while lactate, ethanol, acetaminophen and caffeine
+in the same spectra are predicted at their labels (VAL015: ethanol 70.8 vs 69, lactate 15.4 vs 15).
+A diluted sample would shift every analyte, so a glucose prep or labelling error is the likely cause.
+They are flagged in `label_suspect` (rule: `SUSPECT_LABELS` in `earspectro/data/ntnu.py`) and
+`slurm/run_ntnu.sh` reports each grid with them (`outputs/ntnu_<grid>`) and without them
+(`outputs/ntnu_<grid>_clean`, `import_ntnu --drop_suspect`).
 
-| grid | PLSR unseen-mixture | PLSR day-5 holdout | best nonlinear unseen-mixture |
+PLSR MAE in mg/dL (÷18 for mM). Without / with the two suspect mixtures; the mean predictor scores 220–275:
+
+| grid | unseen mixtures | day-5 holdout | best nonlinear, unseen mixtures |
 |:--|--:|--:|--:|
-| nir (542 bands) | 31.5 (1.7 mM), R² 0.95 | 34.3 (1.9 mM) | FFNN 44.2 |
-| dense (141 bands) | 30.8 (1.7 mM) | 35.5 | FFNN 51.2 |
-| ear5 (5 LEDs) | 102.3 (5.7 mM), R² 0.80 | 95.4 | FFNN 111.1 |
+| nir (542 bands) | **20.4** (1.1 mM), R² 0.988 / 32.1 | **15.7** (0.9 mM), R² 0.994 / 34.5 | FFNN 34.4 |
+| dense (141 bands) | **17.8** (1.0 mM), R² 0.990 / 30.7 | **13.3** (0.7 mM), R² 0.995 / 35.2 | FFNN 35.7 |
+| ear5 (5 LEDs) | **94.6** (5.3 mM), R² 0.85 / 100.4 | **75.7** (4.2 mM), R² 0.86 / 97.2 | FFNN 98.0 |
 
-1. **Real NIR spectra carry recoverable glucose.** PLSR reaches R² ≈ 0.95 on mixtures it never saw
-   and holds up on the separate day-5 set, despite four interferents.
-2. **Five LEDs lose about two-thirds of the accuracy (H2).** ear5 error is ~3× the full-spectrum error
-   in the same samples. In nested selection, 1–2 wavelengths do no better than the mean; the
-   1200/1550/1650 nm triple carries most of what 5 LEDs can do. This matches synthetic finding 2.
-3. **Linear wins again (H3/H4).** PLSR is best on every grid and scenario. The CNN and CatBoost trail
-   PLSR by 35–85 mg/dL on dense and nir. Unlike the synthetic case, CatBoost permutation
-   importance on held-out mixtures is mostly positive (20–30% of wavelengths negative).
-4. **Day-to-day drift hurts nonlinear models most (H5).** Trained on one day and tested on a later
-   day of the same mixture, PLSR moves from 31 to 37 mg/dL, but FFNN goes from 44 to 156 and CatBoost from 67 to 106.
-5. On the day-5 holdout, PLSR RMSE (93) is much larger than its MAE (34), so a few validation
-   mixtures are badly predicted. Worth inspecting before quoting the holdout number.
+1. **Real NIR spectra carry recoverable glucose.** PLSR reaches R² ≈ 0.99 and ~1 mM error on mixtures
+   it never saw and on the separately mixed day-5 set, despite four interferents.
+2. **Five LEDs are about 5× worse than a dense spectrum (H2).** Nested selection on ear5: 1–2
+   wavelengths are near the mean predictor (R² ≤ 0.18); 1200/1550/1650 nm gives R² 0.80, and adding
+   the other two LEDs adds almost nothing. This matches synthetic finding 2.
+3. **Linear wins again (H3/H4).** PLSR is best in every grid and scenario; on ear5 FFNN is closest (98 vs 95 on unseen mixtures).
+   The CNN is the weakest model after the mean predictor on nir. CatBoost permutation importance on
+   held-out mixtures is negative at 20–33% of wavelengths, PLSR's at 0–2%.
+4. **Day-to-day drift hurts nonlinear models most (H5).** In the `session` split (train on a mixture's
+   earlier day, test its later day; only 94 training spectra) PLSR on nir goes from 20 to 34 mg/dL,
+   FFNN from 34 to 83 and CatBoost from 61 to 88. Part of that gap is the smaller training set.
+5. **The suspect labels dominate the headline error.** With them, day-5 PLSR RMSE is ~97 vs MAE ~35;
+   without them RMSE ~20 vs MAE ~16.
+
+QC on this data rejects 0–2.5% of spectra. Two QC bugs surfaced on the way, both fixed and covered
+by tests: the amplitude check treated a 3% baseline offset of cuvette 3 as an outlier (it rejected
+every cuvette-3 spectrum on the nir grid), and the repeat check grouped by `session_id` without
+`subject_id`, so all mixtures from one day were treated as repeats of each other. Neither changes
+synthetic results (synthetic `session_id` already contains the subject; amplitude spread there is
+above the new floor).
 
 Not run on NTNU: `calibration` (there are no per-subject calibration readings in vitro).
 

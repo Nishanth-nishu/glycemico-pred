@@ -73,13 +73,15 @@ def cmd_generate(a):
 
 
 def cmd_import_ntnu(a):
-    df = load_ntnu(a.raw, a.grid)
+    df = load_ntnu(a.raw, a.grid, drop_suspect=a.drop_suspect)
     out = Path(a.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out, index=False)
     cols = spectral_columns(df)
     plots.example_spectra(df, cols, wavelengths_of(cols), out.with_suffix(".spectra.png"))
     log(f"{len(df)} spectra, {df.subject_id.nunique()} mixtures, {len(cols)} wavelengths -> {out}")
+    if df.label_suspect.any():
+        log(f"suspect glucose labels kept: {sorted(df.subject_id[df.label_suspect].unique())}")
     log(f"glucose_ref: mean {df[TARGET_COL].mean():.1f}, range {df[TARGET_COL].min():.0f}-{df[TARGET_COL].max():.0f}")
 
 
@@ -336,6 +338,7 @@ def main():
     n = sub.add_parser("import_ntnu", help="convert the NTNU NIR glucose files (doi:10.18710/NSHFAK)")
     n.add_argument("--raw", required=True, help="folder with CalibrationData.txt and ValidationData.txt")
     n.add_argument("--grid", choices=sorted(GRIDS), default="nir")
+    n.add_argument("--drop_suspect", action="store_true", help="leave out mixtures flagged in SUSPECT_LABELS")
     n.add_argument("--output", required=True)
 
     common(sub.add_parser("qc"), [])

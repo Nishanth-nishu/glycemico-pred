@@ -29,6 +29,8 @@ class QualityControl:
     a_max: float = 4.0           # above this -> detector starved / clipped
     z_max: float = 4.0           # robust-z limit for amplitude, roughness, repeat deviation
     q_min: float = 0.5           # reject spectra with Q below this
+    level_floor: float = 0.02    # amplitude spread floor, as a fraction of the median level, so a
+                                 # small fixed offset (e.g. one cuvette) can't score as extreme
 
     def fit(self, X: np.ndarray) -> "QualityControl":
         X = np.asarray(X, float)
@@ -36,7 +38,8 @@ class QualityControl:
         Xo = X[ok]
         level = Xo.mean(axis=1)
         rough = self._roughness(Xo)
-        self.level_ = (np.median(level), np.median(np.abs(level - np.median(level))))
+        med = np.median(level)
+        self.level_ = (med, max(np.median(np.abs(level - med)), self.level_floor * abs(med)))
         self.rough_ = (np.median(rough), np.median(np.abs(rough - np.median(rough))))
         self.median_spectrum_ = np.median(Xo, axis=0)
         return self
@@ -89,7 +92,8 @@ class QualityControl:
 
 def repeat_groups(df: pd.DataFrame) -> np.ndarray:
     """Group key for repeated spectra of the same subject/session/timepoint."""
-    cols = [c for c in ("session_id", "timepoint") if c in df.columns]
+    # subject_id too: a session_id like "day5" can be shared by many subjects (NTNU mixtures).
+    cols = [c for c in ("subject_id", "session_id", "timepoint") if c in df.columns]
     if not cols:
         return None
     return df[cols].astype(str).agg("|".join, axis=1).to_numpy()

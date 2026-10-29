@@ -17,6 +17,9 @@
 #   Three wavelength grids: nir (1100-2350 nm, 2 nm), dense (1000-1700 nm, 5 nm),
 #   ear5 (the 5 EarSpectro LEDs, 20 nm bands).
 #   No calibration stage: the samples are not time series.
+#   Each grid is also rerun (scenarios only) without the two validation mixtures
+#   whose glucose labels look wrong (SUSPECT_LABELS in earspectro/data/ntnu.py),
+#   into outputs/ntnu_<grid>_clean.
 #
 # Submit:  sbatch slurm/run_ntnu.sh
 # ============================================================================
@@ -43,6 +46,14 @@ for GRID in ear5 dense nir; do
     $RUN wavelengths $COMMON --prep raw
     $RUN selection   $COMMON --prep raw
     $RUN explain     $COMMON --prep raw
+    $RUN report      $COMMON
+
+    DATA=data/ntnu_${GRID}_clean.csv
+    OUT=outputs/ntnu_${GRID}_clean
+    COMMON="--data $DATA --out $OUT --n_jobs $N_JOBS"
+    echo "===== $GRID (suspect labels dropped) ====="
+    $RUN import_ntnu --raw data/ntnu_raw --grid $GRID --output $DATA --drop_suspect
+    $RUN scenarios   $COMMON --prep snv
     $RUN report      $COMMON
 done
 
