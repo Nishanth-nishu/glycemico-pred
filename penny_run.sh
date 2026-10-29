@@ -17,6 +17,11 @@
 #   PENNY_MODE=full sbatch penny_run.sh                   # all 100 companies
 #   PENNY_TICKERS="PDSB india:NHCFOODS" sbatch penny_run.sh
 #   PENNY_MODEL=llama3.1:8b PENNY_MODE=full sbatch penny_run.sh
+#   PENNY_NUM_CTX=32768 sbatch penny_run.sh                # on a 24 GB card
+#
+# plafnet2 (gnode113-118) is out of GPU-minutes until ~1 Nov 2026; until then run on the
+# general partition with the plafnet account:
+#   sbatch -A plafnet -p u22 --qos=normal --nodelist= --gres=gpu:1 -n 10 penny_run.sh
 #
 # Repo source : /home2/nishanth.r/pen_sm/penny-stocks-investing  (git checkout, edit here)
 # Work dir    : /scratch/nishanth.r/penny                        (venv, data/, caches; node-local)
@@ -30,6 +35,8 @@ MODE=${PENNY_MODE:-pilot}
 TICKERS=${PENNY_TICKERS:-"PDSB india:NHCFOODS"}
 MODEL=${PENNY_MODEL:-llama3.1:8b}
 PY312=/software/apps/u22/python/3.12.15/bin/python3.12
+export LD_LIBRARY_PATH=/software/apps/u22/python/3.12.15/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}   # python3.12 needs its libpython
+NUM_CTX=${PENNY_NUM_CTX:-16384}   # 32768 in the repo default; 16k keeps llama3.1:8b inside an 11 GB card
 
 echo "=========================================="
 echo "PENNY TALENT | job $SLURM_JOB_ID on $SLURM_NODELIST | mode=$MODE model=$MODEL"
@@ -42,6 +49,8 @@ mkdir -p "$PROJ" "$RESULTS"
 rsync -a --delete --exclude .venv --exclude data --exclude .env --exclude 'dashboard/index.html' "$SRC/" "$PROJ/"
 cd "$PROJ" || exit 1
 [ -f .env ] || cp .env.example .env
+sed -i "s/^\(  ollama_num_ctx:\) *[0-9]*/\1 $NUM_CTX/" config/sources.yaml
+grep -n 'ollama_num_ctx' config/sources.yaml
 
 # ── 2. python 3.12 venv (repo needs >=3.11; node default is 3.10)
 if [ -x "$PY312" ]; then PY=$PY312; else PY=$(command -v python3.12 || command -v python3.11 || command -v python3); fi
