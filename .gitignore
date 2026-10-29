@@ -10,3 +10,5 @@ outputs/**/qc_scores.csv
 checkpoints/
 data/ntnu_raw/
 penny-stocks-investing/
+penny_results/**/talent.db
+penny_results/**/raw/
