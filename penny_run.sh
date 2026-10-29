@@ -40,14 +40,14 @@ MODEL=${PENNY_MODEL:-llama3.1:8b}
 PY312=/software/apps/u22/python/3.12.15/bin/python3.12
 export LD_LIBRARY_PATH=/software/apps/u22/python/3.12.15/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}   # python3.12 needs its libpython
 NUM_CTX=${PENNY_NUM_CTX:-16384}   # 32768 in the repo default; 16k keeps llama3.1:8b inside an 11 GB card
-OLLAMA_TIMEOUT=${PENNY_OLLAMA_TIMEOUT:-900}   # per-call cap; the 8B model sometimes loops on a chunk, 180 is plenty for normal calls
+OLLAMA_TIMEOUT=${PENNY_OLLAMA_TIMEOUT:-900}   # per-call cap; the 8B model sometimes loops on a chunk (15-25 min); normal calls take <40 s on a 1080 Ti, so 300 is safe
 RESTORE_DB=${PENNY_RESTORE_DB:-}   # talent.db from a previous results dir; used only if scratch has no data/talent.db
 
 echo "=========================================="
 echo "PENNY TALENT | job $SLURM_JOB_ID on $SLURM_NODELIST | mode=$MODE model=$MODEL"
 echo "start: $(date -u '+%F %T') UTC / $(TZ=Asia/Kolkata date '+%T') IST"
 echo "=========================================="
-nvidia-smi --query-gpu=name,memory.total,memory.free --format=csv,noheader
+nvidia-smi --query-gpu=name,driver_version,memory.total,memory.free,utilization.gpu --format=csv,noheader
 
 # ── 1. stage repo into scratch (keep data/ and .venv between runs: caches live there)
 mkdir -p "$PROJ" "$RESULTS"
@@ -73,7 +73,7 @@ echo "venv python: $(.venv/bin/python --version)"
 
 # ── 3. Ollama from node scratch
 source /home2/nishanth.r/pen_sm/ollama_env.sh "$MODEL" || exit 1
-trap ollama_sync_back EXIT
+trap 'cp "$SCR/serve_${SLURM_JOB_ID}.log" "$RESULTS/ollama_serve.log" 2>/dev/null; ollama_sync_back' EXIT   # keep the server log: scratch dies with the job
 export TALENT_EXTRACTION_PROVIDER=ollama
 export TALENT_OLLAMA_URL="http://$OLLAMA_HOST"
 export TALENT_OLLAMA_MODEL="$MODEL"
@@ -85,6 +85,18 @@ stage() { echo; echo "────────── $1  ($(date -u +%T) UTC)"; 
 
 stage "llm-check"
 talent llm-check || exit 1
+# Job 47116 (gnode033) ran the whole pipeline at CPU speed (31 tok/s vs 329 on a 1080 Ti) and every call hit the
+# timeout. Refuse to continue unless the model is fully on the GPU.
+grep -iE 'inference compute|library=|no compatible|unable to load' "$SCR/serve_${SLURM_JOB_ID}.log" | head -5
+ollama ps
+if ! ollama ps | grep -qE '100% *GPU'; then
+    echo "WARNING: $MODEL is not fully on the GPU ($(ollama ps | awk 'NR==2{print $4,$5}')) - expect ~10x slower inference"
+    tail -30 "$SCR/serve_${SLURM_JOB_ID}.log"
+    if [ "${PENNY_ALLOW_CPU:-0}" != 1 ]; then
+        echo "aborting (exit 3). Resubmit with --exclude=$SLURM_NODELIST, or PENNY_ALLOW_CPU=1 to run anyway."
+        exit 3
+    fi
+fi
 
 if [ "$MODE" != "rerun" ]; then       # rerun keeps the universe already in the DB so the export stays comparable
     stage "universe build"
@@ -122,6 +134,7 @@ PENNY_MODEL="$MODEL" .venv/bin/python /home2/nishanth.r/pen_sm/summarize_overvie
 cp -r data/export "$RESULTS/" 2>/dev/null
 cp dashboard/index.html "$RESULTS/dashboard.html" 2>/dev/null
 cp data/talent.db "$RESULTS/" 2>/dev/null
+cp "$SCR/serve_${SLURM_JOB_ID}.log" "$RESULTS/ollama_serve.log" 2>/dev/null
 du -sh "$RESULTS"; ls -la "$RESULTS"
 echo "=========================================="
 echo "DONE $(date -u '+%F %T') UTC / $(TZ=Asia/Kolkata date '+%T') IST  → $RESULTS"

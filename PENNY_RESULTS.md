@@ -59,6 +59,25 @@ The ranking is driven almost entirely by the momentum component (headcount / hir
 
 The int('') bug is fixed on the local `ada-fixes` branch of the clone (commit 91e5312). Each timeout costs ~15–25 min; lowering `ollama_timeout_s` to ~180 s (config/sources.yaml) would cap that at 3 min per bad chunk.
 
+## Rerun attempts
+
+**Job 47116 (gnode033, 29 Oct 2026 17:28-20:59 UTC / 22:58-02:29 IST): failed, nothing new scored.**
+`PENNY_MODE=rerun` over the 23 skipped companies with `ollama_timeout_s: 180`, DB restored from job 46482.
+Ollama ran at CPU speed on that node: 31 prompt tokens/s against 329 tokens/s on gnode027 (same GTX 1080 Ti
+class), the llm-check probe took 27 s instead of under 4 s, and staging the venv, Ollama and models took 51 min
+instead of seconds. Every one of the 23 companies timed out (one got "connection refused" while the server was
+restarting), so `penny_results/47116/export/scores.csv` is identical to 46482's. The one useful output is
+`penny_results/47116/overviews.*`: the summaries were regenerated with the corrected prompt and now read a zero
+integrity penalty as "no red flags" instead of as a warning.
+
+Fixes in `penny_run.sh` after this: it prints the driver version, dumps `ollama ps` after llm-check and exits 3
+unless the model shows `100% GPU` (`PENNY_ALLOW_CPU=1` overrides), and keeps the Ollama server log as
+`penny_results/<job>/ollama_serve.log` so a slow node can be diagnosed after the job is gone.
+
+**Job 47392 (gnode027, submitted 29 Oct 2026 21:10 UTC / 02:40 IST):** same 23 companies, `ollama_timeout_s: 300`,
+`-n 1 --mem-per-cpu=8G` because that node had all four GPUs free but only two CPUs. Results will land in
+`penny_results/47392/`; rebuild the site from that directory when it finishes.
+
 ## Rerunning the failed companies
 
 Inside a job with the venv and Ollama up (see `penny_run.sh`), the DB in `/scratch/nishanth.r/penny/data/talent.db` is incremental:
