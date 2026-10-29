@@ -18,6 +18,11 @@ what the company does and where it is listed, its size (price, market cap, headc
 strong the team looks given the talent score and coverage, and any red flags. If a fact is missing say so briefly
 instead of guessing. Do not add numbers or names that are not in the facts.
 
+How to read the scores: talent_score_0_100 rates the quality of the people at the company (leadership, technical
+bench, momentum, density, minus integrity penalties); below 25 is weak, 25-50 is middling, above 50 is strong.
+coverage_0_1 is the fraction of the workforce the score actually saw (1.0 = everyone); low coverage means the score
+is based on few people, not that analysts ignore the stock. Describe the score honestly using these bands.
+
 FACTS
 {facts}
 """
