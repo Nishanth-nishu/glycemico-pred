@@ -22,6 +22,9 @@ How to read the scores: talent_score_0_100 rates the quality of the people at th
 bench, momentum, density, minus integrity penalties); below 25 is weak, 25-50 is middling, above 50 is strong.
 coverage_0_1 is the fraction of the workforce the score actually saw (1.0 = everyone); low coverage means the score
 is based on few people, not that analysts ignore the stock. Describe the score honestly using these bands.
+The components are sub-scores: leadership, technical_bench, momentum and density run 0-100 (higher is better);
+integrity_penalty is points deducted for red flags, so an integrity_penalty of 0 means no red flags were found
+and is good news, not a warning. Only call something a red flag if it is listed as one in the facts.
 
 FACTS
 {facts}
