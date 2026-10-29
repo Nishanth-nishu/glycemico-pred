@@ -10,6 +10,16 @@ Outputs in `penny_results/46482/`:
 - `dashboard.html`, `export/dashboard.json`, `export/universe.csv`
 - `talent.db` (ignored by git, on the cluster only); `live/` holds the 10-minute snapshots taken while the job ran
 
+## Website
+
+The results are published as a GitHub Pages site built from `docs/` by `build_site.py`:
+https://nishanth-nishu.github.io/glycemico-pred/ (summary and leaderboard, interactive dashboard,
+all company overviews with a text filter, scores.csv). Rebuild after a new run with
+
+```bash
+python3 build_site.py penny_results/<jobid> && git add docs && git commit -m "site: job <jobid>" && git push
+```
+
 ## Headline numbers
 
 | | |
