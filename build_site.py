@@ -89,10 +89,10 @@ def main():
         f'<td class="num">{r["cov_f"]:.2f}</td><td class="num">{r["people_i"]}</td></tr>' for r in rows[:20])
     idx = head("Penny Talent Results") + f'''
 <h1>Penny-stock talent screen</h1>
-<p class="sub">Job {e(job)} on {e(meta.get("node","the Ada cluster"))}, model {e(meta.get("model","llama3.1:8b"))} via local Ollama. {e(when)}.</p>
+<p class="sub">Job {e(job)} on {e(meta.get("node","the Ada cluster"))}, model {e(meta.get("model","llama3.1:8b"))} via local Ollama. {e(when)}.{" This job reran the companies that failed in the full run, on top of that run's database; the numbers below cover all 100." if meta.get("mode")=="rerun" else ""}</p>
 {nav}
 <div class="stats">
-<div class="stat"><b>{len(rows)}</b><span>companies scored</span></div>
+<div class="stat"><b>{sum(1 for r in rows if r.get("score"))}</b><span>companies scored (of {len(rows)})</span></div>
 <div class="stat"><b>{with_people}</b><span>with named people</span></div>
 <div class="stat"><b>{meta.get("skipped","-")}</b><span>skipped by errors</span></div>
 <div class="stat"><b>{bands["weak"]} / {bands["middling"]} / {bands["strong"]}</b><span>weak / middling / strong</span></div>

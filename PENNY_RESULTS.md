@@ -1,4 +1,8 @@
-# Penny-stocks talent pipeline: full run results
+# Penny-stocks talent pipeline: results
+
+Current state (after rerun job 47396, 30 Oct 2026): **89 of 100 companies scored**, 62 with named people, 11 still skipped by Ollama timeouts. The website and `docs/` are built from `penny_results/47396/`, which holds the complete export.
+
+## Full run (job 46482)
 
 Job 46482, gnode027 (GTX 1080 Ti 11 GB), account plafnet / partition u22, model llama3.1:8b via local Ollama.
 Started 2026-10-29 09:15 UTC (14:45 IST), finished 16:35 UTC (22:05 IST), 7 h 20 min, exit 0.
@@ -25,12 +29,12 @@ python3 build_site.py penny_results/<jobid> && git add docs && git commit -m "si
 | | |
 |---|---|
 | Companies processed | 100 (50 India, 50 US) |
-| Companies with at least one named person | 50 |
-| Companies with no people (no filing text found, or stage failed) | 50 (31 India, 19 US) |
+| Companies with at least one named person | 50 (62 after rerun 47396) |
+| Companies with no people (no filing text found, or stage failed) | 50 (31 India, 19 US); 38 after rerun 47396 |
 | Score band | all 100 are "weak" (< 25) by the pipeline's own thresholds |
-| Going-concern flags | 24 |
-| Reverse-merger flags | 9 |
-| Per-company failures | 23 (see below) |
+| Going-concern flags | 24 (34 after rerun) |
+| Reverse-merger flags | 9 (12 after rerun) |
+| Per-company failures | 23 (11 after rerun, see below) |
 
 Top 10 by talent score:
 
@@ -41,6 +45,7 @@ Top 10 by talent score:
 | india | AVROIND | Avro India | 21.5 | 0.21 | 13 |
 | india | EVEXIA | Evexia Lifecare | 21.0 | 0.60 | 23 |
 | india | LANDSMILL | Landsmill Green | 21.0 | 0.60 | 23 |
+| india | VSL | Viram Suvarn (added by rerun 47396) | 21.0 | 0.45 | 22 |
 | us | DAVI | Davion Healthcare | 21.0 | 0.60 | 8 |
 | india | STARLENT | StarlinePS Enterprises | 20.3 | 0.60 | 16 |
 | india | NHCFOODS | NHC Foods | 20.2 | 0.32 | 15 |
@@ -74,9 +79,21 @@ Fixes in `penny_run.sh` after this: it prints the driver version, dumps `ollama 
 unless the model shows `100% GPU` (`PENNY_ALLOW_CPU=1` overrides), and keeps the Ollama server log as
 `penny_results/<job>/ollama_serve.log` so a slow node can be diagnosed after the job is gone.
 
-**Job 47392 (gnode027, submitted 29 Oct 2026 21:10 UTC / 02:40 IST):** same 23 companies, `ollama_timeout_s: 300`,
-`-n 1 --mem-per-cpu=8G` because that node had all four GPUs free but only two CPUs. Results will land in
-`penny_results/47392/`; rebuild the site from that directory when it finishes.
+**Job 47392:** pinned to gnode027 (warm scratch) but the scheduler projected a start on 1 Nov, so it was cancelled.
+
+**Job 47396 (gnode057, RTX 2080 Ti, 29 Oct 2026 21:12-22:55 UTC / 30 Oct 02:42-04:25 IST): 12 of 23 recovered, exit 0.**
+Same 23 companies with `ollama_timeout_s: 300`, DB restored from job 46482; the GPU guard reported `100% GPU`
+and the model averaged 724 prompt tokens/s. Newly scored: VSL 21.0 (22 people), BIAF 17.0, BKYI 16.1, OLB 15.0,
+SLNH 13.3, ASHNI 8.9, SOAR 7.0, FTFT 5.9, YMAT 2.0, VSEE 1.3, VSEED 1.3, MEDS 0.0 (27 people). The parser-bug and
+DNS companies all came back; of the 14 original timeouts only 3 did (ASHNI, VSL, BIAF).
+
+Still skipped after two attempts, each timing out twice at 300 s on one long filing chunk: A1L, GATECH, GPRO,
+IPDN, TENX, XHG, XPON, ALEC, DFDV, AMOD, JZ. A longer timeout will not help (the same chunks ran past 900 s in
+job 46482). Options: lower `ollama_chunk_chars` in `config/sources.yaml` (default 40000) so each call is shorter,
+or run those 11 with a stronger model on a 24 GB card (plafnet2 nodes, once GPU minutes reset ~1 Nov 2026).
+
+`penny_results/47396/` is now the most complete export (89 scored); use its `talent.db` as `PENNY_RESTORE_DB` for
+any further rerun.
 
 ## Rerunning the failed companies
 
@@ -88,4 +105,4 @@ talent export
 .venv/bin/python /home2/nishanth.r/pen_sm/summarize_overviews.py --db data/talent.db --out <results dir>
 ```
 
-Scratch on gnode027 is purged after ~7–10 days, so copy `penny_results/46482/talent.db` back into scratch first if the node has been cleaned.
+Scratch is per node and purged after ~7–10 days; `PENNY_RESTORE_DB=penny_results/47396/talent.db` restores the latest state on a fresh node.
