@@ -25,7 +25,7 @@
 #
 # Repo source : /home2/nishanth.r/pen_sm/penny-stocks-investing  (git checkout, edit here)
 # Work dir    : /scratch/nishanth.r/penny                        (venv, data/, caches; node-local)
-# Results     : /home2/nishanth.r/pen_sm/penny_results/<jobid>/  (exports copied back every run)
+# Results     : /home2/nishanth.r/pen_sm/penny_results/<jobid>/  (exports + overviews.md copied back every run)
 
 set -o pipefail
 SRC=/home2/nishanth.r/pen_sm/penny-stocks-investing
@@ -98,7 +98,12 @@ stage "status + export"
 talent status
 talent export
 
-# ── 5. copy results home
+# ── 5. company overviews via the same Ollama server
+stage "overview summaries"
+if [ "$MODE" = "full" ]; then ONLY=(); else ONLY=(--only); for t in $TICKERS; do case "$t" in india:*) ONLY+=("$t");; *) ONLY+=("us:$t");; esac; done; fi
+PENNY_MODEL="$MODEL" .venv/bin/python /home2/nishanth.r/pen_sm/summarize_overviews.py --db data/talent.db --out "$RESULTS" "${ONLY[@]}"
+
+# ── 6. copy results home
 cp -r data/export "$RESULTS/" 2>/dev/null
 cp dashboard/index.html "$RESULTS/dashboard.html" 2>/dev/null
 cp data/talent.db "$RESULTS/" 2>/dev/null
