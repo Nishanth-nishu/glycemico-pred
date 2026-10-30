@@ -1,9 +1,5 @@
 # glycemico-pred — EarSpectro non-invasive glucose prediction
 
-> **Also in this repo:** the penny-stocks talent pipeline run on Ada with local Ollama.
-> Start at [PENNY_README.md](PENNY_README.md) (handover: what was done, how to run, open items),
-> then [PENNY_RESULTS.md](PENNY_RESULTS.md) (numbers) and the site in `docs/`.
-
 ML/DL framework for predicting blood glucose from multi-wavelength near-infrared
 (NIR) spectra measured at the earlobe. It implements the staged plan from the
 EarSpectro literature survey:
