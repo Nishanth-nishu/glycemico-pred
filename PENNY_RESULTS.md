@@ -1,6 +1,6 @@
 # Penny-stocks talent pipeline: results
 
-Current state (after rerun job 47396, 30 Oct 2026): **89 of 100 companies scored**, 62 with named people, 11 still skipped by Ollama timeouts. The website and `docs/` are built from `penny_results/47396/`, which holds the complete export.
+Current state (after rerun job 47991, 30 Oct 2026): **92 of 100 companies scored**, 65 with named people, 8 still skipped by Ollama timeouts (A1L, GATECH, GPRO, IPDN, TENX, XHG, XPON, DFDV). The website and `docs/` are built from `penny_results/47991/`, which holds the complete export.
 
 ## Full run (job 46482)
 
@@ -29,12 +29,12 @@ python3 build_site.py penny_results/<jobid> && git add docs && git commit -m "si
 | | |
 |---|---|
 | Companies processed | 100 (50 India, 50 US) |
-| Companies with at least one named person | 50 (62 after rerun 47396) |
-| Companies with no people (no filing text found, or stage failed) | 50 (31 India, 19 US); 38 after rerun 47396 |
+| Companies with at least one named person | 50 (65 after reruns) |
+| Companies with no people (no filing text found, or stage failed) | 50 (31 India, 19 US); 35 after reruns |
 | Score band | all 100 are "weak" (< 25) by the pipeline's own thresholds |
-| Going-concern flags | 24 (34 after rerun) |
-| Reverse-merger flags | 9 (12 after rerun) |
-| Per-company failures | 23 (11 after rerun, see below) |
+| Going-concern flags | 24 (35 after reruns) |
+| Reverse-merger flags | 9 (12 after reruns) |
+| Per-company failures | 23 (8 after reruns, see below) |
 
 Top 10 by talent score:
 
@@ -92,7 +92,16 @@ IPDN, TENX, XHG, XPON, ALEC, DFDV, AMOD, JZ. A longer timeout will not help (the
 job 46482). Options: lower `ollama_chunk_chars` in `config/sources.yaml` (default 40000) so each call is shorter,
 or run those 11 with a stronger model on a 24 GB card (plafnet2 nodes, once GPU minutes reset ~1 Nov 2026).
 
-`penny_results/47396/` is now the most complete export (89 scored); use its `talent.db` as `PENNY_RESTORE_DB` for
+**Job 47991 (gnode049, RTX 2080 Ti, 30 Oct 2026 08:09-09:04 UTC / 13:39-14:34 IST): 3 of 11 recovered, exit 0.**
+`ollama_chunk_chars: 15000`, `ollama_timeout_s: 180`, DB restored from job 47396. Newly scored: AMOD 15.8 (30 people,
+rank 17), JZ 9.9, ALEC 3.9. Successful calls averaged 4 s (max 21 s), so the chunk size is not the problem for the
+other 8: A1L, GATECH, GPRO, IPDN, TENX, XHG, XPON, DFDV each timed out twice on their first chunk. The pipeline sends
+Ollama a JSON schema (`format`) at temperature 0 with no `num_predict` cap, so on those documents the model emits
+list entries forever until the client gives up. The fix is in the pipeline, not the job: add `num_predict` (about 4096)
+to the Ollama `options` in `src/talent/extract/bios.py` so a runaway chunk returns truncated JSON, fails validation and
+is logged as a bad chunk while the company's other chunks still count.
+
+`penny_results/47991/` is now the most complete export (92 scored); use its `talent.db` as `PENNY_RESTORE_DB` for
 any further rerun.
 
 ## Rerunning the failed companies
@@ -105,4 +114,4 @@ talent export
 .venv/bin/python /home2/nishanth.r/pen_sm/summarize_overviews.py --db data/talent.db --out <results dir>
 ```
 
-Scratch is per node and purged after ~7–10 days; `PENNY_RESTORE_DB=penny_results/47396/talent.db` restores the latest state on a fresh node.
+Scratch is per node and purged after ~7–10 days; `PENNY_RESTORE_DB=penny_results/47991/talent.db` restores the latest state on a fresh node.

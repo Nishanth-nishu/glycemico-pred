@@ -1,6 +1,6 @@
 # Penny-stocks talent pipeline on Ada: handover
 
-Last updated 2026-10-30 08:20 UTC (13:50 IST). Written for whoever picks this up next,
+Last updated 2026-10-30 09:15 UTC (14:45 IST). Written for whoever picks this up next,
 human or Claude session. Everything here lives in this repo (`glycemico-pred`, folder
 checked out at `/home2/nishanth.r/pen_sm` on the Ada login node) except the private
 pipeline repo and the job outputs that are too big for git.
@@ -20,11 +20,11 @@ Scores are 0-100; the pipeline's own bands are weak (<25), middling (25-50), str
 
 | | |
 |---|---|
-| Companies scored | 89 of 100 (job 47396 export), all in the weak band; top is Urja Global 23.2 |
-| Companies with named people | 62 |
-| Still skipped | 11: A1L, GATECH, GPRO, IPDN, TENX, XHG, XPON, ALEC, DFDV, AMOD, JZ (model loops on one long filing chunk) |
-| Job in progress | 47991 on gnode049: reruns those 11 with 15000-char chunks and a 180 s timeout, started 2026-10-30 08:09 UTC (13:39 IST) |
-| Website | `docs/` is a complete GitHub Pages site built from `penny_results/47396`; Pages is **not enabled yet** on the repo (API `has_pages: false`). Enable in Settings > Pages: Deploy from a branch, `main`, `/docs`. Expected URL https://nishanth-nishu.github.io/glycemico-pred/ |
+| Companies scored | 92 of 100 (job 47991 export), all in the weak band; top is Urja Global 23.2 |
+| Companies with named people | 65 |
+| Still skipped | 8: A1L, GATECH, GPRO, IPDN, TENX, XHG, XPON, DFDV (model loops on their first chunk even at 15000 chars; needs a `num_predict` cap in the pipeline, see PENNY_RESULTS.md) |
+| Job in progress | none. Last: 47991 on gnode049 (30 Oct 08:09-09:04 UTC), recovered AMOD, JZ, ALEC |
+| Website | `docs/` is a complete GitHub Pages site built from `penny_results/47991`; Pages is **not enabled yet** on the repo (API `has_pages: false`). Enable in Settings > Pages: Deploy from a branch, `main`, `/docs`. Expected URL https://nishanth-nishu.github.io/glycemico-pred/ |
 | Results note | `PENNY_RESULTS.md` (numbers, top 10, failure analysis, rerun history) |
 
 ## 3. Where things live
@@ -42,7 +42,7 @@ Repo files (this folder):
 | `penny_db_snapshot.sh` | nohup loop on the node: copies the live DB to `penny_results/<job>/live/` every 10 min (edit `OUT` for the job). Insurance against a job dying before it copies results home. |
 | `PENNY_RESULTS.md` | Results and run history. |
 | `OLLAMA.md` | Ollama-on-Ada notes. |
-| `penny_results/<job>/` | `export/scores.csv`, `export/dashboard.json`, `dashboard.html`, `overviews.md/json`; `talent.db` and `ollama_serve.log` exist on the cluster but are git-ignored. Jobs: 46482 (full run), 47116 (failed rerun), 47396 (rerun, most complete), 47991 (running). |
+| `penny_results/<job>/` | `export/scores.csv`, `export/dashboard.json`, `dashboard.html`, `overviews.md/json`; `talent.db` and `ollama_serve.log` exist on the cluster but are git-ignored. Jobs: 46482 (full run), 47116 (failed rerun), 47396 (rerun), 47991 (rerun, most complete). |
 | `docs/` | The website. |
 | `logs/penny_<job>.log` | SLURM job logs (git-ignored, cluster only). |
 
@@ -66,7 +66,7 @@ PENNY_MODE=full sbatch -A plafnet -p u22 --qos=normal --nodelist= --exclude=gnod
 
 ```bash
 # rerun some companies on top of the latest database, then refresh export + overviews for all 100
-PENNY_MODE=rerun PENNY_TICKERS="india:A1L GPRO" PENNY_RESTORE_DB=penny_results/47396/talent.db PENNY_OLLAMA_TIMEOUT=180 PENNY_CHUNK_CHARS=15000 sbatch -A plafnet -p u22 --qos=normal --nodelist= --exclude=gnode033 --gres=gpu:1 -n 10 --time=6:00:00 penny_run.sh
+PENNY_MODE=rerun PENNY_TICKERS="india:A1L GPRO" PENNY_RESTORE_DB=penny_results/47991/talent.db PENNY_OLLAMA_TIMEOUT=180 PENNY_CHUNK_CHARS=15000 sbatch -A plafnet -p u22 --qos=normal --nodelist= --exclude=gnode033 --gres=gpu:1 -n 10 --time=6:00:00 penny_run.sh
 ```
 
 Watch a job: `squeue -u nishanth.r`, `tail -f logs/penny_<job>.log` (filter noise with
@@ -102,6 +102,9 @@ python3 build_site.py penny_results/<job> && git add docs && git commit -m "site
    89 of 100 scored. Site rebuilt from it (commit f4a7ebc).
 9. `PENNY_CHUNK_CHARS` added, `PENNY_RESTORE_DB` now always replaces the scratch DB;
    job 47991 submitted for the last 11 companies with 15000-char chunks.
+10. Job 47991 (gnode049, 55 min) recovered AMOD, JZ and ALEC: 92 of 100 scored. The other 8
+   time out on their first chunk regardless of size; the model loops inside the JSON-schema
+   output because nothing caps `num_predict`. Site rebuilt from 47991.
 
 ## 6. Cluster lessons (read before running anything)
 
@@ -127,9 +130,10 @@ These do not depend on each other; each can be its own session or person.
 
 - **Enable GitHub Pages** on the repo (Settings > Pages, main, /docs) and verify the three pages.
   Claude sessions cannot do this: the API call is blocked by the permission classifier.
-- **Finish the last 11 companies**: wait for job 47991; if some still time out, try
-  `PENNY_CHUNK_CHARS=8000`, or llama3.2:3b, or a 24 GB plafnet2 node after 1 Nov with a
-  larger model (`PENNY_MODEL`, `PENNY_NUM_CTX=32768`).
+- **Finish the last 8 companies**: add `"num_predict": 4096` to the Ollama `options` dict in
+  `src/talent/extract/bios.py` (branch `ada-fixes`) so runaway chunks stop instead of timing out,
+  then rerun A1L GATECH GPRO IPDN TENX XHG XPON DFDV from `penny_results/47991/talent.db`.
+  Alternatives: llama3.2:3b, or a 24 GB plafnet2 node after 1 Nov with a larger model.
 - **Score quality**: leadership is <=10 and technical bench 0 almost everywhere, so the
   ranking is really a momentum ranking. Worth checking what the extraction returns for a
   few companies (`talent people show <ticker>`, `talent score <ticker> --explain` inside a
