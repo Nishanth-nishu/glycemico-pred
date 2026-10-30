@@ -18,8 +18,8 @@
 #   PENNY_TICKERS="PDSB india:NHCFOODS" sbatch penny_run.sh
 #   PENNY_MODEL=llama3.1:8b PENNY_MODE=full sbatch penny_run.sh
 #   PENNY_NUM_CTX=32768 sbatch penny_run.sh                # on a 24 GB card
-#   PENNY_MODE=rerun PENNY_TICKERS="BKYI india:A1L" PENNY_RESTORE_DB=penny_results/46482/talent.db \
-#       PENNY_OLLAMA_TIMEOUT=180 sbatch penny_run.sh         # redo some companies on top of an earlier DB,
+#   PENNY_MODE=rerun PENNY_TICKERS="BKYI india:A1L" PENNY_RESTORE_DB=penny_results/47396/talent.db \
+#       PENNY_OLLAMA_TIMEOUT=180 PENNY_CHUNK_CHARS=15000 sbatch penny_run.sh         # redo some companies on top of an earlier DB,
 #                                                            # then refresh export + overviews for everyone
 #
 # plafnet2 (gnode113-118) is out of GPU-minutes until ~1 Nov 2026; until then run on the
@@ -41,7 +41,8 @@ PY312=/software/apps/u22/python/3.12.15/bin/python3.12
 export LD_LIBRARY_PATH=/software/apps/u22/python/3.12.15/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}   # python3.12 needs its libpython
 NUM_CTX=${PENNY_NUM_CTX:-16384}   # 32768 in the repo default; 16k keeps llama3.1:8b inside an 11 GB card
 OLLAMA_TIMEOUT=${PENNY_OLLAMA_TIMEOUT:-900}   # per-call cap; the 8B model sometimes loops on a chunk (15-25 min); normal calls take <40 s on a 1080 Ti, so 300 is safe
-RESTORE_DB=${PENNY_RESTORE_DB:-}   # talent.db from a previous results dir; used only if scratch has no data/talent.db
+CHUNK_CHARS=${PENNY_CHUNK_CHARS:-40000}   # chars per Ollama extraction call; 15000 for companies whose 40k chunks make the model loop
+RESTORE_DB=${PENNY_RESTORE_DB:-}   # talent.db from a previous results dir; always copied over scratch when set (node scratch may hold an older run)
 
 echo "=========================================="
 echo "PENNY TALENT | job $SLURM_JOB_ID on $SLURM_NODELIST | mode=$MODE model=$MODEL"
@@ -54,11 +55,11 @@ mkdir -p "$PROJ" "$RESULTS"
 rsync -a --delete --exclude .venv --exclude data --exclude .env --exclude 'dashboard/index.html' "$SRC/" "$PROJ/"
 cd "$PROJ" || exit 1
 [ -f .env ] || cp .env.example .env
-sed -i "s/^\(  ollama_num_ctx:\) *[0-9]*/\1 $NUM_CTX/; s/^\(  ollama_timeout_s:\) *[0-9]*/\1 $OLLAMA_TIMEOUT/" config/sources.yaml
-grep -nE 'ollama_num_ctx|ollama_timeout_s' config/sources.yaml
-if [ -n "$RESTORE_DB" ] && [ ! -f data/talent.db ]; then
+sed -i "s/^\(  ollama_num_ctx:\) *[0-9]*/\1 $NUM_CTX/; s/^\(  ollama_timeout_s:\) *[0-9]*/\1 $OLLAMA_TIMEOUT/; s/^\(  ollama_chunk_chars:\) *[0-9]*/\1 $CHUNK_CHARS/" config/sources.yaml
+grep -nE 'ollama_num_ctx|ollama_timeout_s|ollama_chunk_chars' config/sources.yaml
+if [ -n "$RESTORE_DB" ]; then
     [ "${RESTORE_DB:0:1}" = / ] || RESTORE_DB=/home2/nishanth.r/pen_sm/$RESTORE_DB
-    mkdir -p data && cp "$RESTORE_DB" data/talent.db && echo "restored DB from $RESTORE_DB"
+    mkdir -p data && rm -f data/talent.db-wal data/talent.db-shm && cp "$RESTORE_DB" data/talent.db && echo "restored DB from $RESTORE_DB"
 fi
 
 # ── 2. python 3.12 venv (repo needs >=3.11; node default is 3.10)
