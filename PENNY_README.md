@@ -1,6 +1,6 @@
 # Penny-stocks talent pipeline on Ada: handover
 
-Last updated 2026-10-30 09:15 UTC (14:45 IST). Written for whoever picks this up next,
+Last updated 2026-10-30 11:05 UTC (16:35 IST). Written for whoever picks this up next,
 human or Claude session. Everything here lives in this repo (`glycemico-pred`, folder
 checked out at `/home2/nishanth.r/pen_sm` on the Ada login node) except the private
 pipeline repo and the job outputs that are too big for git.
@@ -24,7 +24,7 @@ Scores are 0-100; the pipeline's own bands are weak (<25), middling (25-50), str
 | Companies with named people | 65 |
 | Still skipped | 8: A1L, GATECH, GPRO, IPDN, TENX, XHG, XPON, DFDV (model loops on their first chunk even at 15000 chars; needs a `num_predict` cap in the pipeline, see PENNY_RESULTS.md) |
 | Job in progress | none. Last: 47991 on gnode049 (30 Oct 08:09-09:04 UTC), recovered AMOD, JZ, ALEC |
-| Website | `docs/` is a complete GitHub Pages site built from `penny_results/47991`; Pages is **not enabled yet** on the repo (API `has_pages: false`). Enable in Settings > Pages: Deploy from a branch, `main`, `/docs`. Expected URL https://nishanth-nishu.github.io/glycemico-pred/ |
+| Website | **Live** at https://nishanth-nishu.github.io/glycemico-pred/ (GitHub Pages, branch `main`, folder `/docs`, enabled 2026-10-30 11:00 UTC / 16:30 IST via the REST API after the Settings UI saves did not register). Rebuild with `build_site.py` and push; Pages redeploys in about a minute. |
 | Results note | `PENNY_RESULTS.md` (numbers, top 10, failure analysis, rerun history) |
 
 ## 3. Where things live
@@ -128,8 +128,6 @@ python3 build_site.py penny_results/<job> && git add docs && git commit -m "site
 
 These do not depend on each other; each can be its own session or person.
 
-- **Enable GitHub Pages** on the repo (Settings > Pages, main, /docs) and verify the three pages.
-  Claude sessions cannot do this: the API call is blocked by the permission classifier.
 - **Finish the last 8 companies**: add `"num_predict": 4096` to the Ollama `options` dict in
   `src/talent/extract/bios.py` (branch `ada-fixes`) so runaway chunks stop instead of timing out,
   then rerun A1L GATECH GPRO IPDN TENX XHG XPON DFDV from `penny_results/47991/talent.db`.

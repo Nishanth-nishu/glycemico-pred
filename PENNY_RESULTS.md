@@ -16,7 +16,7 @@ Outputs in `penny_results/46482/`:
 
 ## Website
 
-The results are published as a GitHub Pages site built from `docs/` by `build_site.py`:
+The results are published as a GitHub Pages site (live since 2026-10-30 11:00 UTC) built from `docs/` by `build_site.py`:
 https://nishanth-nishu.github.io/glycemico-pred/ (summary and leaderboard, interactive dashboard,
 all company overviews with a text filter, scores.csv). Rebuild after a new run with
 
